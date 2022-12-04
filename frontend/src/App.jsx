@@ -1,28 +1,35 @@
-import {useState} from 'react';
-import logo from './assets/images/logo-universal.png';
-import './App.css';
-import {Greet} from "../wailsjs/go/main/App";
+import {useEffect, useState} from 'react';
 
-function App() {
-    const [resultText, setResultText] = useState("Please enter your name below 👇");
-    const [name, setName] = useState('');
-    const updateName = (e) => setName(e.target.value);
-    const updateResultText = (result) => setResultText(result);
+import {
+    MainContainer
+} from './Styles';
 
-    function greet() {
-        Greet(name).then(updateResultText);
-    }
+import PluginInfoContainer from './components/PluginInfoContainer';
+import PluginSourceListContainer from './components/PluginSourceListContainer';
+import PluginLibsListContainer from './components/PluginLibsListContainer';
+import ActionsContainer from './components/ActionsContainer';
+import { PluginInfoContext } from './services/PluginInfo';
+
+export default function App() {
+
+    const [pluginInfo, setPluginInfo] = useState({});
+
+    useEffect(() => {
+        setTimeout(() => setPluginInfo({
+            name: "Pocketmine",
+            version: "1.0.0",
+            api: "3.0.0"
+        }), 3000);
+    }, []);
 
     return (
-        <div id="App">
-            <img src={logo} id="logo" alt="logo"/>
-            <div id="result" className="result">{resultText} Minha cacetta</div>
-            <div id="input" className="input-box">
-                <input id="name" className="input" onChange={updateName} autoComplete="off" name="input" type="text"/>
-                <button className="btn" onClick={greet}>Greet</button>
-            </div>
-        </div>
+        <PluginInfoContext.Provider value={pluginInfo}>
+            <MainContainer>
+                <PluginInfoContainer/>
+                <PluginSourceListContainer/>
+                <PluginLibsListContainer/>
+                <ActionsContainer/>
+            </MainContainer>
+        </PluginInfoContext.Provider>
     )
 }
-
-export default App
