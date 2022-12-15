@@ -13,7 +13,13 @@ import (
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
 var mainApp *App
+var project *Project
+
+type Slapow struct {
+	Name string `json:"name"`
+}
 
 func main() {
 	// Create an instance of the app structure
@@ -24,7 +30,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "Manuseador de librarias / Plugins PocketMine-MP",
+		Title:  "Manuseador de livrarias / Plugins PocketMine-MP",
 		Width:  1024,
 		Height: 768,
 		Menu:   appMenu,
@@ -33,6 +39,7 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 255, A: 1},
 		OnStartup:        app.startup,
+		OnDomReady:       app.domready,
 		Bind: []interface{}{
 			app,
 		},
@@ -47,9 +54,34 @@ func createMenu() *menu.Menu {
 	appMenu := menu.NewMenu()
 	fileSubMenu := appMenu.AddSubmenu("Arquivo")
 	fileSubMenu.AddText("Abrir plugin", keys.CmdOrCtrl("o"), func(cd *menu.CallbackData) {
-		runtime.OpenDirectoryDialog(mainApp.ctx, runtime.OpenDialogOptions{
-			Title: "Abrir pasta do plugin",
-		})
+		OpenPluginFolder()
 	})
 	return appMenu
+}
+
+func handleSelectPluginFile() (directory string, result bool) {
+	dir, err := runtime.OpenDirectoryDialog(mainApp.ctx, runtime.OpenDialogOptions{
+		Title: "Abrir pasta do plugin",
+	})
+
+	result = false
+
+	if err != nil {
+		return
+	}
+
+	if !validatePluginDirectory(dir) {
+		if len(dir) > 0 {
+			runtime.MessageDialog(mainApp.ctx, runtime.MessageDialogOptions{
+				Title:   "ERROR",
+				Message: "Não foi possivel validar o diretorio do plugin!",
+			})
+		}
+
+		return
+	}
+
+	result = true
+	directory = dir
+	return
 }

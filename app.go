@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -10,12 +11,14 @@ type App struct {
 	ctx context.Context
 }
 
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+func (a *App) domready(ctx context.Context) {
+	runtime.EventsOn(ctx, "handle_select_plugin", func(optionalData ...interface{}) {
+		OpenPluginFolder()
+	})
 }
 
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
 }
 
 // NewApp creates a new App application struct
