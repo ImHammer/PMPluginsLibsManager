@@ -25,3 +25,7 @@ func (a *App) startup(ctx context.Context) {
 func NewApp() *App {
 	return &App{}
 }
+
+// func showNotification(title, message, nottype string) {
+// 	runtime.EventsEmit(mainApp.ctx, "notification", )
+// }

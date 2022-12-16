@@ -52,36 +52,12 @@ func main() {
 
 func createMenu() *menu.Menu {
 	appMenu := menu.NewMenu()
-	fileSubMenu := appMenu.AddSubmenu("Arquivo")
+	fileSubMenu := appMenu.AddSubmenu("Plugin")
 	fileSubMenu.AddText("Abrir plugin", keys.CmdOrCtrl("o"), func(cd *menu.CallbackData) {
 		OpenPluginFolder()
 	})
-	return appMenu
-}
-
-func handleSelectPluginFile() (directory string, result bool) {
-	dir, err := runtime.OpenDirectoryDialog(mainApp.ctx, runtime.OpenDialogOptions{
-		Title: "Abrir pasta do plugin",
+	fileSubMenu.AddText("Adicionar livraria", keys.CmdOrCtrl("L"), func (cd *menu.CallbackData) {
+		
 	})
-
-	result = false
-
-	if err != nil {
-		return
-	}
-
-	if !validatePluginDirectory(dir) {
-		if len(dir) > 0 {
-			runtime.MessageDialog(mainApp.ctx, runtime.MessageDialogOptions{
-				Title:   "ERROR",
-				Message: "Não foi possivel validar o diretorio do plugin!",
-			})
-		}
-
-		return
-	}
-
-	result = true
-	directory = dir
-	return
+	return appMenu
 }

@@ -54,31 +54,35 @@ export default function App() {
             setSources(() => (JSON.parse(sourcesList)));
         });
 
-        EventsOn("notification", notify => {
+        EventsOn("notification", (title, message, type) => {
             setNotifications(() => [
                 ...notifications,
-                notify
+                {
+                    title,
+                    message,
+                    type
+                }
             ]);
         });
 
-        setNotifications(() => [
-            ...notifications,
-            {
-                title: "Testando",
-                message: "Testando as notificações",
-                type: 'success'
-            },
-            {
-                title: "Testando",
-                message: "Testando as notificações",
-                type: 'danger'
-            },
-            {
-                title: "Testando",
-                message: "Testando as notificações",
-                type: 'warning'
-            }
-        ]);
+        // setNotifications(() => [
+        //     ...notifications,
+        //     {
+        //         title: "Testando",
+        //         message: "Testando as notificações",
+        //         type: 'success'
+        //     },
+        //     {
+        //         title: "Testando",
+        //         message: "Testando as notificações",
+        //         type: 'danger'
+        //     },
+        //     {
+        //         title: "Testando",
+        //         message: "Testando as notificações",
+        //         type: 'warning'
+        //     }
+        // ]);
     }, []);
 
     function hasNotifications() {

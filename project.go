@@ -12,7 +12,7 @@ import (
 )
 
 type ProjectLibs struct {
-	Requireds []string `json:"requireds"`
+	Requireds map[string]string `json:"requireds"`
 }
 
 type Project struct {
@@ -75,8 +75,9 @@ func (p *Project) loadPluginInfo() {
 	pluginInfo, err := loadPluginInfo(p.PluginInfoPath)
 
 	if err != nil {
-		fmt.Println("- NÃO FOI POSSIVEL CARREGAR A plugin.yml")
-		log.Fatalln(err)
+		// fmt.Println("- NÃO FOI POSSIVEL CARREGAR A plugin.yml")
+		// log.Fatalln(err)
+		sendNotification("plugin.yml ERROR", "Não foi carregar a plugin.yml do seu plugin, revise-o", DANGER)
 		return
 	}
 
@@ -93,17 +94,60 @@ func (p *Project) loadSources() {
 func (p *Project) loadLibraries() {
 	fmt.Println("-> LOADING PLUGIN SOURCES ...")
 
-	for _, libName := range p.Libs.Requireds {
+	for libName, version := range p.Libs.Requireds {
+		
 		libName = strings.ToLower(libName)
 		libPath := filepath.Join(p.LibsPath, libName)
-		if fileExists(libPath) {
+		libConfigPath := filepath.Join(libPath, "lib.json")
 
+		if fileExists(libPath) && fileExists(libConfigPath) {
+			
+
+			// files, err := filepath.Glob(filepath.Join(libPath, "*"))
+
+			// if err != nil {
+			// 	folderLib := 
+			// }
 		} else {
-			fmt.Println("REQUIRED LIB WITH NAME", libName, "NOT FOUND!")
+			// fmt.Println("REQUIRED LIB WITH NAME", libName, "NOT FOUND!")
+			sendNotification("LIB NOT FOUND", "O plugin necessita da livraria com o nome: " + libName, WARNING)
 		}
 	}
 
 	fmt.Println("- LOADED PLUGIN SOURCES ...")
+}
+
+func CreateProject(directory string) *Project {
+	return &Project{
+		Directory: directory,
+	}
+}
+
+func handleSelectPluginFile() (directory string, result bool) {
+	dir, err := runtime.OpenDirectoryDialog(mainApp.ctx, runtime.OpenDialogOptions{
+		Title: "Abrir pasta do plugin",
+	})
+
+	result = false
+
+	if err != nil {
+		return
+	}
+
+	if !validatePluginDirectory(dir) {
+		if len(dir) > 0 {
+			runtime.MessageDialog(mainApp.ctx, runtime.MessageDialogOptions{
+				Title:   "ERROR",
+				Message: "Não foi possivel validar o diretorio do plugin!",
+			})
+		}
+
+		return
+	}
+
+	result = true
+	directory = dir
+	return
 }
 
 func OpenPluginFolder() {
@@ -112,7 +156,6 @@ func OpenPluginFolder() {
 		project = CreateProject(directory)
 		project.init()
 
-		// fmt.Println("SLAPOW", filepath.Join(project.MainFilePath, ".."))
 		pluginInfoData, err := jsoniter.Marshal(project.PluginInfo)
 		if err != nil {
 			log.Fatalln(err)
@@ -126,11 +169,5 @@ func OpenPluginFolder() {
 		}
 
 		runtime.EventsEmit(mainApp.ctx, "plugin_data", string(pluginInfoData), string(sourcesData))
-	}
-}
-
-func CreateProject(directory string) *Project {
-	return &Project{
-		Directory: directory,
 	}
 }

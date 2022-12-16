@@ -98,28 +98,3 @@ func getProjectMainPackage(project *Project) string {
 	return result[:len(result)-1]
 }
 
-// func makeDirectoryTree(directory string) (map[string]interface{}, []string) {
-// 	tree := make(map[string]interface{})
-// 	files := make([]string, 1)
-// 	fileInfo, err := os.Stat(directory)
-
-// 	if err == nil {
-// 		if fileInfo.IsDir() {
-// 			internalFiles, err := filepath.Glob(filepath.Join(directory, "*"))
-// 			if err == nil {
-// 				for _, internal := range internalFiles {
-// 					// fileInfoInternal, err := os.Stat(internal)
-// 					if fileInfoInternal, err := os.Stat(internal); err == nil {
-// 						if fileInfoInternal.IsDir() {
-// 							tree[filepath.Base(internal)] := makeDirectoryTree(internal)
-// 						} else {
-
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	return tree, files
-// }
