@@ -1,19 +1,22 @@
-# README
 
-## About
+# PMLibsM
+Manuseio e criação de livrarias para ![PocketMine-MP](https://github.com/pmmp/PocketMine-MP)
 
-This is the official Wails React template.
+## O que é ?
+É uma aplicação para o gerenciamento de livrarias para plugins do PocketMine-MP, apesar da existência do Virion, eu optei por fazer este programa para melhor uso pessoal.
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+## É necessario?
+Dadas as situações em que eu preciso de um jeito rápido de instalar a lib e sair usando, sim, é necessário
 
-## Live Development
+## Como usar ?
+Não é um bicho de sete cabeças, apenas abra o programa e siga os passos abaixo:
+- Pressione em qualquer um dos quadrados para abrir um plugin
+- Selecione a pasta do seu plugin, onde contem a `plugin.yml`
+- Apos isso pressione nas ações abaixo que estarão auto-explicativa
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+# Contribuições
+Caso queira contribuir com o projeto, peço que esteja colaborando com ideias e formas mais rápidas de resolver os mais diversos problemas gerado por plugins!
 
-## Building
-
-To build a redistributable, production mode package, use `wails build`.
+# Adições futuras
+- Sistema de atualizar (parcialmente) os plugins de PocketMine 3.x -> PocketMine 4.x
+- Ação de criar a estrutura de um plugin com apenas um click
