@@ -19,19 +19,21 @@ type PluginInfo struct {
 }
 
 func loadPluginInfo(filePath string) (pluginInfo *PluginInfo, err error) {
+	pluginInfo = &PluginInfo{}
+	err = loadYml(pluginInfo, filePath)
+	return
+}
 
+func loadYml(out interface{}, filePath string) error {
 	pluginInfoBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return
+		return err
 	}
 
-	loadedPluginInfoData := &PluginInfo{}
-
-	err = yaml.Unmarshal(pluginInfoBytes, loadedPluginInfoData)
+	err = yaml.Unmarshal(pluginInfoBytes, out)
 	if err != nil {
-		return
+		return err
 	}
 
-	pluginInfo = loadedPluginInfoData
-	return
+	return nil
 }

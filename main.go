@@ -4,18 +4,14 @@ import (
 	"embed"
 
 	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 var mainApp *App
-var project *Project
 
 type Slapow struct {
 	Name string `json:"name"`
@@ -26,14 +22,16 @@ func main() {
 	app := NewApp()
 	mainApp = app
 
-	appMenu := createMenu()
+	// appMenu := createMenu()
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "Manuseador de livrarias / Plugins PocketMine-MP",
-		Width:  1024,
-		Height: 768,
-		Menu:   appMenu,
+		Title:         "Manuseador de livrarias / Plugins PocketMine-MP",
+		MinWidth:      840,
+		MinHeight:     480,
+		MaxWidth:      840,
+		MaxHeight:     480,
+		DisableResize: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -48,16 +46,4 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
-}
-
-func createMenu() *menu.Menu {
-	appMenu := menu.NewMenu()
-	fileSubMenu := appMenu.AddSubmenu("Plugin")
-	fileSubMenu.AddText("Abrir plugin", keys.CmdOrCtrl("o"), func(cd *menu.CallbackData) {
-		OpenPluginFolder()
-	})
-	fileSubMenu.AddText("Adicionar livraria", keys.CmdOrCtrl("L"), func (cd *menu.CallbackData) {
-		
-	})
-	return appMenu
 }

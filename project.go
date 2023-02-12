@@ -1,173 +1,290 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/exp/maps"
 )
 
-type ProjectLibs struct {
-	Requireds map[string]string `json:"requireds"`
+// const LIBS_DIRECTORY_PREFIX = "pmlibs"
+// const LIB_STATUS_ADDED = "added_lib"
+
+const (
+	LIBS_DIRECTORY_PREFIX = "pmlibs"
+
+	LIB_STATUS_ADDED   LibStatus = "added_lib"
+	LIB_STATUS_REMOVED LibStatus = "removed_lib"
+	LIB_STATUS_NATIVE  LibStatus = "native_lib"
+)
+
+type LibStatus string
+
+type LibInfo struct {
+	Name      string    `json:"name"`
+	Version   string    `json:"version"`
+	Namespace string    `json:"namespace"`
+	LibStatus LibStatus `json:"lib_status"`
+}
+
+type LibsInfo struct {
+	Libraries []LibInfo `json:"libraries"`
+	Updated   string    `json:"updated"`
+}
+
+type LibExternalInfo struct {
+	LibInfo
+	HasChanges bool   `json:"hasChanges"`
+	IsPlugin   bool   `json:"isPlugin"`
+	Directory  string `json:"directory"`
 }
 
 type Project struct {
-	PluginFolderName string
-	PluginInfo       *PluginInfo
+	Plugin        PluginInfo
+	Directory     string
+	LibsDirectory string
 
-	Directory      string
-	PluginInfoPath string
-	MainFilePath   string
-	MainPackage    string
+	Libs map[string]LibInfo
 
-	LibsPath       string
-	LibsFileConfig string
-	Libs           *ProjectLibs
+	NewLibs    []LibExternalInfo
+	RemoveLibs []LibExternalInfo
 
-	Sources DirectoryTree `json:"sources"`
+	NewLibForAdd LibExternalInfo
 }
 
-func (p *Project) init() {
-	fmt.Println("-> PROJECT INIT")
+func (p *Project) sendPluginInfos() {
+	var err error
 
-	p.PluginFolderName = filepath.Base(p.Directory)
-	p.PluginInfoPath = filepath.Join(p.Directory, "plugin.yml")
-
-	p.loadPluginInfo()
-
-	p.MainFilePath = getProjectMainPath(p)
-	p.MainPackage = getProjectMainPackage(p)
-	p.Libs = &ProjectLibs{
-		Requireds: make([]string, 0),
-	}
-
-	libsConfig := filepath.Join(p.Directory, "pm_libs.json")
-	libsPath := filepath.Join(filepath.Dir(p.MainFilePath), "libs")
-
-	if !fileExists(libsConfig) {
-		file, err := os.Create(libsConfig)
-		if err != nil {
+	pluginEncodedBytes, err := jsoniter.Marshal(p.Plugin)
+	if err == nil {
+		libsEncodedBytes, err := jsoniter.Marshal(maps.Values(p.Libs))
+		if err == nil {
+			runtime.EventsEmit(mainApp.ctx, "start_project", string(pluginEncodedBytes), string(libsEncodedBytes))
 			return
 		}
-		projectLibsData, err := jsoniter.Marshal(p.Libs)
-		if err != nil {
-			return
+	}
+
+	fmt.Println(err.Error())
+}
+
+func (p *Project) addLib(lib LibInfo) {
+	p.Libs[lib.Name] = lib
+}
+
+func (p *Project) handleUpdateLibs() {
+	os.MkdirAll(p.LibsDirectory, os.ModePerm)
+
+	file, err := os.Create(filepath.Join(p.LibsDirectory, "libs.json"))
+	check(err)
+
+	libsInfoData := &LibsInfo{}
+	libsInfoData.Updated = ParseActualDataString()
+	libsInfoData.Libraries = maps.Values(p.Libs)
+
+	jsonData, err := jsoniter.Marshal(libsInfoData)
+	check(err)
+
+	file.WriteString(string(jsonData))
+	defer file.Close()
+
+	libsDataStr, err := jsoniter.Marshal(p.Libs)
+	check(err)
+
+	runtime.EventsEmit(mainApp.ctx, "stf_update_libs", string(libsDataStr))
+}
+
+func (p *Project) handleRemoveLibs() {
+	forRemoveLibs := ArrayMap(p.RemoveLibs, func(lib LibExternalInfo) string {
+		if fileExists(lib.Directory) {
+			os.RemoveAll(lib.Directory)
 		}
-		file.Write(projectLibsData)
-		file.Close()
-	}
-
-	if !fileExists(libsPath) {
-		os.Mkdir(libsPath, 0755)
-	}
-
-	p.loadSources()
-	p.loadLibraries()
+		return lib.Name
+	})
+	ArrayMap(forRemoveLibs, func(libName string) string {
+		delete(p.Libs, libName)
+		return libName
+	})
 }
 
-func (p *Project) loadPluginInfo() {
-	fmt.Println("-> LOADING plugin.yml...")
+func (p *Project) handleAddLibs() {
+	ArrayMap(p.NewLibs, func(lib LibExternalInfo) bool {
+		hasErrors := false
+		if fileExists(lib.Directory) {
+			libArchivesDirectory := lib.Directory
+			if lib.IsPlugin {
+				libArchivesDirectory = filepath.Join(libArchivesDirectory, "src")
+			}
 
-	pluginInfo, err := loadPluginInfo(p.PluginInfoPath)
+			/// CRIANDO O DIRETORIO DA LIB
+			libDirName := strings.ToLower("lib" + lib.Name)
+			// libPath := filepath.Join(p.LibsDirectory, libDirName)
+			libPath := p.getLibDirectory(lib.Name)
+			os.MkdirAll(libPath, os.ModePerm)
 
-	if err != nil {
-		// fmt.Println("- NÃO FOI POSSIVEL CARREGAR A plugin.yml")
-		// log.Fatalln(err)
-		sendNotification("plugin.yml ERROR", "Não foi carregar a plugin.yml do seu plugin, revise-o", DANGER)
-		return
-	}
+			// NAMESPACE PARA OS ARQUIVOS
+			libFileNamespace := getPluginMainNamespace(p.Plugin.Main)
+			libFileNamespace = libFileNamespace + "\\" + LIBS_DIRECTORY_PREFIX + "\\" + libDirName
 
-	p.PluginInfo = pluginInfo
-	fmt.Println("- LOADED plugin.yml...")
-}
+			libFiles := getAllPHPFiles(libArchivesDirectory)
+			for _, libFile := range libFiles {
+				file, err := os.Open(libFile)
+				if err != nil {
+					hasErrors = true
+					return false
+				}
 
-func (p *Project) loadSources() {
-	fmt.Println("-> LOADING PLUGIN SOURCES ...")
-	p.Sources = makeDirectoryTree(p.Directory)
-	fmt.Println("- LOADED PLUGIN SOURCES ...")
-}
+				fileInfo, err := file.Stat()
+				if err != nil {
+					hasErrors = true
+					return false
+				}
 
-func (p *Project) loadLibraries() {
-	fmt.Println("-> LOADING PLUGIN SOURCES ...")
+				fileName := fileInfo.Name()
 
-	for libName, version := range p.Libs.Requireds {
-		
-		libName = strings.ToLower(libName)
-		libPath := filepath.Join(p.LibsPath, libName)
-		libConfigPath := filepath.Join(libPath, "lib.json")
+				fileScanner := bufio.NewScanner(file)
+				fileScanner.Split(bufio.ScanLines)
 
-		if fileExists(libPath) && fileExists(libConfigPath) {
-			
+				fileLines := make([]string, 0)
+				for fileScanner.Scan() {
+					fileLine := fileScanner.Text()
 
-			// files, err := filepath.Glob(filepath.Join(libPath, "*"))
+					if strings.Contains(fileLine, "namespace") {
+						// IS NAMESPACE LINE
+						fileLines = append(fileLines, "namespace "+libFileNamespace+";")
+					} else if strings.Contains(fileLine, "use") && strings.Contains(fileLine, lib.Namespace) {
+						// IS USE IMPORTING ONE FILE FROM LIB
+						continue
+					} else {
+						fileLines = append(fileLines, fileLine)
+					}
+				}
 
-			// if err != nil {
-			// 	folderLib := 
-			// }
+				newFileData := strings.Join(fileLines, "\n")
+
+				newFile, err := os.Create(filepath.Join(libPath, fileName))
+				if err != nil {
+					hasErrors = true
+					return false
+				}
+
+				newFile.WriteString(string(newFileData))
+			}
 		} else {
-			// fmt.Println("REQUIRED LIB WITH NAME", libName, "NOT FOUND!")
-			sendNotification("LIB NOT FOUND", "O plugin necessita da livraria com o nome: " + libName, WARNING)
+			hasErrors = true
 		}
-	}
 
-	fmt.Println("- LOADED PLUGIN SOURCES ...")
-}
-
-func CreateProject(directory string) *Project {
-	return &Project{
-		Directory: directory,
-	}
-}
-
-func handleSelectPluginFile() (directory string, result bool) {
-	dir, err := runtime.OpenDirectoryDialog(mainApp.ctx, runtime.OpenDialogOptions{
-		Title: "Abrir pasta do plugin",
+		if !hasErrors {
+			p.Libs[lib.Name] = lib.LibInfo
+		}
+		return true
 	})
 
-	result = false
+	// for _, lib := range p.NewLibs {
+	// 	hasErrors := false
+	// 	if fileExists(lib.Directory) {
+	// 		libArchivesDirectory := lib.Directory
+	// 		if lib.IsPlugin {
+	// 			libArchivesDirectory = filepath.Join(libArchivesDirectory, "src")
+	// 		}
 
-	if err != nil {
-		return
-	}
+	// 		/// CRIANDO O DIRETORIO DA LIB
+	// 		libDirName := strings.ToLower("lib" + lib.Name)
+	// 		// libPath := filepath.Join(p.LibsDirectory, libDirName)
+	// 		libPath := p.getLibDirectory(lib.Name)
+	// 		os.MkdirAll(libPath, os.ModePerm)
 
-	if !validatePluginDirectory(dir) {
-		if len(dir) > 0 {
-			runtime.MessageDialog(mainApp.ctx, runtime.MessageDialogOptions{
-				Title:   "ERROR",
-				Message: "Não foi possivel validar o diretorio do plugin!",
-			})
-		}
+	// 		// NAMESPACE PARA OS ARQUIVOS
+	// 		libFileNamespace := getPluginMainNamespace(p.Plugin.Main)
+	// 		libFileNamespace = libFileNamespace + "\\" + LIBS_DIRECTORY_PREFIX + "\\" + libDirName
 
-		return
-	}
+	// 		libFiles := getAllPHPFiles(libArchivesDirectory)
+	// 		for _, libFile := range libFiles {
+	// 			file, err := os.Open(libFile)
+	// 			if err != nil {
+	// 				hasErrors = true
+	// 				return
+	// 			}
 
-	result = true
-	directory = dir
-	return
+	// 			fileInfo, err := file.Stat()
+	// 			if err != nil {
+	// 				hasErrors = true
+	// 				return
+	// 			}
+
+	// 			fileName := fileInfo.Name()
+
+	// 			fileScanner := bufio.NewScanner(file)
+	// 			fileScanner.Split(bufio.ScanLines)
+
+	// 			fileLines := make([]string, 0)
+	// 			for fileScanner.Scan() {
+	// 				fileLine := fileScanner.Text()
+
+	// 				if strings.Contains(fileLine, "namespace") {
+	// 					// IS NAMESPACE LINE
+	// 					fileLines = append(fileLines, "namespace "+libFileNamespace+";")
+	// 				} else if strings.Contains(fileLine, "use") && strings.Contains(fileLine, lib.Namespace) {
+	// 					// IS USE IMPORTING ONE FILE FROM LIB
+	// 					continue
+	// 				} else {
+	// 					fileLines = append(fileLines, fileLine)
+	// 				}
+	// 			}
+
+	// 			newFileData := strings.Join(fileLines, "\n")
+
+	// 			newFile, err := os.Create(filepath.Join(libPath, fileName))
+	// 			if err != nil {
+	// 				hasErrors = true
+	// 				return
+	// 			}
+
+	// 			newFile.WriteString(string(newFileData))
+	// 		}
+	// 	} else {
+	// 		hasErrors = true
+	// 	}
+
+	// 	if !hasErrors {
+	// 		p.Libs[lib.Name] = lib.LibInfo
+	// 	}
+	// }
+
+	// p.NewLibs = make([]LibExternalInfo, 0)
 }
 
-func OpenPluginFolder() {
-	directory, result := handleSelectPluginFile()
-	if result {
-		project = CreateProject(directory)
-		project.init()
+func (p *Project) save() {
+	p.handleUpdateLibs()
 
-		pluginInfoData, err := jsoniter.Marshal(project.PluginInfo)
-		if err != nil {
-			log.Fatalln(err)
-			return
-		}
+	p.handleRemoveLibs()
+	p.handleAddLibs()
 
-		sourcesData, err := jsoniter.Marshal(project.Sources)
-		if err != nil {
-			log.Fatalln(err)
-			return
-		}
+	p.handleUpdateLibs()
+}
 
-		runtime.EventsEmit(mainApp.ctx, "plugin_data", string(pluginInfoData), string(sourcesData))
+func (p *Project) getLibDirectory(libName string) string {
+	libDirName := strings.ToLower("lib" + libName)
+	libPath := filepath.Join(p.LibsDirectory, libDirName)
+	return libPath
+}
+
+var project *Project
+
+func startProject(plugin PluginInfo, directory string) {
+	project = &Project{
+		Plugin:       plugin,
+		Directory:    directory,
+		Libs:         make(map[string]LibInfo),
+		NewLibs:      make([]LibExternalInfo, 0),
+		RemoveLibs:   make([]LibExternalInfo, 0),
+		NewLibForAdd: LibExternalInfo{},
 	}
+
+	libsDirectory := filepath.Join(filepath.Dir(ParseMainDirectory(project.Directory, project.Plugin.Main)), "pmlibs")
+	project.LibsDirectory = libsDirectory
 }

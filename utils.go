@@ -1,11 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
+	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func validatePluginDirectory(directory string) bool {
@@ -32,6 +35,13 @@ type DirectoryTree struct {
 	Files       []string               `json:"files"`
 }
 
+func check(err error) {
+	if err != nil {
+		// panic(err)
+		fmt.Println(err)
+	}
+}
+
 func makeDirectoryTree(directory string) DirectoryTree {
 	tree := DirectoryTree{}
 
@@ -56,6 +66,38 @@ func makeDirectoryTree(directory string) DirectoryTree {
 	return tree
 }
 
+func getAllPHPFiles(directory string) []string {
+	phpFiles := make([]string, 0)
+
+	internalFiles, err := filepath.Glob(filepath.Join(directory, "*"))
+	if err == nil {
+		for _, internal := range internalFiles {
+			file, err := os.Open(internal)
+			if err != nil {
+				continue
+			}
+
+			fileInfo, err := file.Stat()
+			if err != nil {
+				continue
+			}
+
+			if fileInfo.IsDir() {
+				phpFiles = append(phpFiles, getAllPHPFiles(internal)...)
+			} else {
+				extension := filepath.Ext(internal)
+				if extension == ".php" {
+					phpFiles = append(phpFiles, internal)
+				}
+			}
+		}
+	} else {
+		check(err)
+	}
+
+	return phpFiles
+}
+
 func fileExists(file string) bool {
 	if _, err := os.Stat(file); os.IsNotExist(err) {
 		return false
@@ -64,37 +106,57 @@ func fileExists(file string) bool {
 	return true
 }
 
-func getProjectMainPath(project *Project) string {
-	if project.PluginInfo.Main == "" {
-		return ""
+func handleSelectPluginFile() (directory string, result bool) {
+	dir, err := runtime.OpenDirectoryDialog(mainApp.ctx, runtime.OpenDialogOptions{
+		Title: "Abrir pasta do plugin",
+	})
+
+	result = false
+
+	if err != nil {
+		return
 	}
 
-	splitedPath := strings.Split(project.PluginInfo.Main, "\\")
-	mainPath := filepath.Join(project.Directory, "src")
+	if !validatePluginDirectory(dir) {
+		if len(dir) > 0 {
+			runtime.MessageDialog(mainApp.ctx, runtime.MessageDialogOptions{
+				Title:   "ERROR",
+				Message: "Não foi possivel validar o diretorio do plugin!",
+			})
+		}
+
+		return
+	}
+
+	result = true
+	directory = dir
+	return
+}
+
+func ParseMainDirectory(base, main string) string {
+	splitedPath := strings.Split(main, "\\")
+	mainPath := filepath.Join(base, "src")
 
 	for _, path := range splitedPath {
 		mainPath = filepath.Join(mainPath, path)
 	}
 
-	if mainPath == project.Directory {
-		return ""
-	}
-
-	mainPath += ".php"
-	return mainPath
+	return mainPath + ".php"
 }
 
-func getProjectMainPackage(project *Project) string {
-	if project.PluginInfo.Main == "" {
-		return ""
-	}
-
-	regex, err := regexp.Compile(`([\W\w]+)[\\]`)
-	if err != nil {
-		return ""
-	}
-
-	result := regex.FindString(project.PluginInfo.Main)
-	return result[:len(result)-1]
+func ParseActualDataString() string {
+	return time.Now().Format("02-01-2006")
 }
 
+func getPluginMainNamespace(main string) string {
+	splitedMAin := strings.Split(main, "\\")
+
+	namespace := ""
+	for i, part := range splitedMAin {
+		if i < (len(splitedMAin) - 1) {
+			namespace += part + "\\"
+		}
+	}
+
+	return namespace[:len(namespace)-1]
+}
