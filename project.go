@@ -113,6 +113,9 @@ func (p *Project) handleRemoveLibs() {
 
 func (p *Project) handleAddLibs() {
 	ArrayMap(p.NewLibs, func(lib LibExternalInfo) bool {
+
+		fmt.Println("NAMESPACE DA LIB ATUAL QUE ESTA SENDO TESTADA: " + lib.Namespace)
+
 		hasErrors := false
 		if fileExists(lib.Directory) {
 			libArchivesDirectory := lib.Directory
@@ -149,19 +152,39 @@ func (p *Project) handleAddLibs() {
 				fileScanner := bufio.NewScanner(file)
 				fileScanner.Split(bufio.ScanLines)
 
+				findedClassDeclaration := false
+
 				fileLines := make([]string, 0)
 				for fileScanner.Scan() {
 					fileLine := fileScanner.Text()
 
-					if strings.Contains(fileLine, "namespace") {
-						// IS NAMESPACE LINE
-						fileLines = append(fileLines, "namespace "+libFileNamespace+";")
-					} else if strings.Contains(fileLine, "use") && strings.Contains(fileLine, lib.Namespace) {
-						// IS USE IMPORTING ONE FILE FROM LIB
-						continue
-					} else {
-						fileLines = append(fileLines, fileLine)
+					if strings.Contains(fileLine, "class") && !findedClassDeclaration {
+						findedClassDeclaration = true
 					}
+
+					if strings.Contains(fileLine, "namespace") {
+						fileLines = append(fileLines, "namespace "+libFileNamespace+";")
+						continue
+					} else if strings.Contains(fileLine, lib.Namespace) {
+						fmt.Println("ENCONTRADA UMA LINHA QUE CONTEM O NAMESPACE: " + lib.Namespace)
+						if findedClassDeclaration {
+							fileLines = append(fileLines, strings.ReplaceAll(fileLine, lib.Namespace, ""))
+						}
+						continue
+					}
+
+					fileLines = append(fileLines, fileLine)
+					// if strings.Contains(fileLine, "class") && findedClassDeclaration == false {
+					// 	findedClassDeclaration = true
+					// } else if strings.Contains(fileLine, "namespace") {
+					// 	// IS NAMESPACE LINE
+					// 	fileLines = append(fileLines, "namespace "+libFileNamespace+";")
+					// } else if strings.Contains(fileLine, "use") && strings.Contains(fileLine, lib.Namespace) {
+					// 	// IS USE IMPORTING ONE FILE FROM LIB
+					// 	continue
+					// } else {
+					// 	fileLines = append(fileLines, fileLine)
+					// }
 				}
 
 				newFileData := strings.Join(fileLines, "\n")

@@ -65,6 +65,7 @@ export default function Plugins() {
         return addLibConfig.name !== ''
                && addLibConfig.version !== ''
                && addLibConfig.directory !== ''
+               && addLibConfig.namespace !== ''
     }
 
     function onClickedInLib(libName) {
@@ -87,7 +88,7 @@ export default function Plugins() {
 
             inputNameRef.current.value = newLibForAdd.name;
             inputVersionRef.current.value = newLibForAdd.version;
-            // inputNamespaceRef.current.value = newLibForAdd.namespace;
+            inputNamespaceRef.current.value = newLibForAdd.namespace;
             inputDirectoryRef.current.value = newLibForAdd.directory;
         });
     }, []);
@@ -128,12 +129,14 @@ export default function Plugins() {
 
             inputNameRef.current.value      = '';
             inputVersionRef.current.value   = '';
-            // inputNamespaceRef.current.value = '';
+            inputNamespaceRef.current.value = '';
             inputDirectoryRef.current.value = '';
 
             changed(() => (true));
         }
     }
+
+    console.log("LIBS MAP: ", plugin.libs)
 
     function isRemoveLib(libName) {
         return forRemove.indexOf(libName) != -1
@@ -154,6 +157,16 @@ export default function Plugins() {
 
     function save() {
         EventsEmit('request_back_save_project');
+        changed(() => (false));
+    }
+
+    function cancelAddLib() {
+        inputNameRef.current.value      = '';
+        inputVersionRef.current.value   = '';
+        inputNamespaceRef.current.value = '';
+        inputDirectoryRef.current.value = '';
+
+        setShowAddLibrary(false)
     }
 
     return (
@@ -167,10 +180,16 @@ export default function Plugins() {
                             <LibraryInputTitle>Nome</LibraryInputTitle>
                             <LibraryInput ref={inputNameRef} onBlur={() => unfocusAddLibInput('name', inputNameRef)} name="name" type="text" />
                         </InputGroupContainer>
-                        <InputGroupContainer>
-                            <LibraryInputTitle>Versão</LibraryInputTitle>
-                            <LibraryInput ref={inputVersionRef} onBlur={() => unfocusAddLibInput('version', inputVersionRef)} name="version" type="text" />
-                        </InputGroupContainer>
+                        <DoubleInputContent>
+                            <InputGroupContainer>
+                                <LibraryInputTitle>Versão</LibraryInputTitle>
+                                <LibraryInput ref={inputVersionRef} onBlur={() => unfocusAddLibInput('version', inputVersionRef)} name="version" type="text" />
+                            </InputGroupContainer>
+                            <InputGroupContainer>
+                                <LibraryInputTitle>Namespace</LibraryInputTitle>
+                                <LibraryInput ref={inputNamespaceRef} onBlur={() => unfocusAddLibInput('namespace', inputNamespaceRef)} name="namespace" type="text" />
+                            </InputGroupContainer>
+                        </DoubleInputContent>
                         <DoubleInputContent>
                             <InputGroupContainer>
                                 <LibraryInputTitle>Diretorio</LibraryInputTitle>
@@ -180,7 +199,7 @@ export default function Plugins() {
                         </DoubleInputContent>
                         <DoubleInputContent>
                             <AddButton unlocked={canAddLib()} onClick={() => handleCompleteAddLib()}>Adicionar</AddButton>
-                            <AddButton unlocked onClick={() => setShowAddLibrary(false)}>Cancelar</AddButton>
+                            <AddButton unlocked onClick={cancelAddLib}>Cancelar</AddButton>
                         </DoubleInputContent>
                     </Form>
                 </AddLibraryContainer>

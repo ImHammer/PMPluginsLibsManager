@@ -54,7 +54,7 @@ export default function App() {
             const libs = JSON.parse(libsStr);
             dispatchPlugin({
                 type: 'update_libs',
-                payload: libs
+                payload: Object.values(libs)
             })
         });
     }, []);
